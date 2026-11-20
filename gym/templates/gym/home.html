@@ -1,0 +1,78 @@
+{% extends "gym/base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">Gym Classes</h1>
+  <span class="text-muted">{{ classes|length }} classes available</span>
+</div>
+
+{% for gym_class in classes %}
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        <h2 class="h5 mb-1">{{ gym_class.name }}</h2>
+        <p class="text-muted mb-1">{{ gym_class.description }}</p>
+        <span class="badge text-bg-secondary">Instructor: {{ gym_class.instructor }}</span>
+      </div>
+    </div>
+
+    {% if gym_class.upcoming_sessions %}
+      <div class="table-responsive mt-3">
+        <table class="table align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Starts</th>
+              <th>Ends</th>
+              <th>Capacity</th>
+              <th>Spots left</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for session in gym_class.upcoming_sessions %}
+              {% with booked=session.booked_count left=session.available_spots %}
+              <tr class="session-row">
+                <td>{{ session.start_time|date:"D, M j Y H:i" }}</td>
+                <td>{{ session.end_time|date:"H:i" }}</td>
+                <td>{{ session.capacity }}</td>
+                <td>
+                  {% if left <= 0 %}
+                    <span class="spots-full">FULL</span>
+                  {% else %}
+                    <span class="spots-ok">{{ left }} of {{ session.capacity }}</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  {% if session.has_started %}
+                    <span class="badge text-bg-dark">Started</span>
+                  {% elif session.is_full %}
+                    <span class="badge text-bg-danger">Fully booked</span>
+                  {% elif user.is_authenticated %}
+                    {% if user.is_staff %}
+                      <a class="btn btn-outline-primary btn-sm" href="{% url 'session_roster' session.id %}">View roster</a>
+                    {% else %}
+                      <form method="post" action="{% url 'book_session' session.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="btn btn-primary btn-sm">Book</button>
+                      </form>
+                    {% endif %}
+                  {% else %}
+                    <a class="btn btn-outline-primary btn-sm" href="{% url 'login' %}?next={% url 'home' %}">Log in to book</a>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted mb-0 mt-2">No upcoming sessions.</p>
+    {% endif %}
+  </div>
+</div>
+{% empty %}
+  <div class="alert alert-info">No classes have been created yet. Add some in the <a href="{% url 'admin:index' %}">admin panel</a>.</div>
+{% endfor %}
+{% endblock %}

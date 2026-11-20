@@ -1,0 +1,69 @@
+{% extends "gym/base.html" %}
+
+{% block title %}My Bookings{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">My Bookings</h1>
+
+{% if bookings %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Class</th>
+            <th>Starts</th>
+            <th>Ends</th>
+            <th>Booked on</th>
+            <th>Status</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for booking in bookings %}
+            {% with session=booking.session %}
+            <tr class="session-row">
+              <td>
+                <strong>{{ session.gym_class.name }}</strong><br>
+                <small class="text-muted">{{ session.gym_class.instructor }}</small>
+              </td>
+              <td>{{ session.start_time|date:"D, M j Y H:i" }}</td>
+              <td>{{ session.end_time|date:"H:i" }}</td>
+              <td>{{ booking.created_at|date:"M j, H:i" }}</td>
+              <td>
+                {% if booking.status == "active" %}
+                  <span class="badge text-bg-success">Active</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">Cancelled</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if booking.status == "active" %}
+                  {% with reason=booking.cancellation_error %}
+                    {% if reason %}
+                      <span class="text-muted small" title="{{ reason }}">{{ reason }}</span>
+                    {% else %}
+                      <form method="post" action="{% url 'cancel_booking' booking.id %}" class="d-inline"
+                            onsubmit="return confirm('Cancel this booking?');">
+                        {% csrf_token %}
+                        <button class="btn btn-outline-danger btn-sm">Cancel</button>
+                      </form>
+                    {% endif %}
+                  {% endwith %}
+                {% else %}
+                  <span class="text-muted small">&mdash;</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="alert alert-info">
+    You have no bookings yet. <a href="{% url 'home' %}">Browse classes</a> to book one.
+  </div>
+{% endif %}
+{% endblock %}
