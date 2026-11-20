@@ -12,9 +12,10 @@ Built with **Django + SQLite**, Django's built-in authentication, and Bootstrap 
 ### Member
 - Register, log in, log out
 - Browse all gym classes and their upcoming sessions with **spots remaining**
-- Book a session (one booking per member per session)
+- Book a session (one active booking per member per session)
 - View **My Bookings**
 - Cancel a booking (when allowed)
+- **Re-book a session after cancelling** — a fresh booking row is created
 
 ### Administrator
 - Full Django admin panel at `/admin/` to create and edit classes, sessions, and capacities
@@ -29,20 +30,22 @@ Built with **Django + SQLite**, Django's built-in authentication, and Bootstrap 
 | # | Rule | Where it is enforced |
 |---|------|----------------------|
 | 1 | A session cannot be booked once it is at capacity | `Session.booking_error_for()` |
-| 2 | A member cannot book the same session twice | `Session.booking_error_for()` **and** a DB `UniqueConstraint` on `(user, session)` |
+| 2 | A member cannot have two **active** bookings for the same session | `Session.booking_error_for()` **and** a partial DB `UniqueConstraint` on `(user, session)` where `status = 'active'` |
 | 3 | Sessions that have started or are in the past cannot be booked | `Session.booking_error_for()` |
 | 4 | Cancellation is allowed only at least **2 hours** before the start time | `Session.cancellation_error_for()`, `CANCEL_WINDOW_HOURS` |
 | 5 | Members can only see and cancel **their own** bookings | `@login_required` + `get_object_or_404(..., user=request.user)` |
 | 6 | Cancelled bookings free up their spot | `Session.booked_count` counts only `ACTIVE` bookings |
+| 7 | Cancelling allows re-booking the same session later | Partial unique index + `Booking.can_rebook` |
 
 All booking and cancellation decisions live in **one place** —
 `gym/models.py` — so the rules stay consistent across every page.
-Views simply call `session.booking_error_for(user)` and show the returned
-reason string if it is not `None`.
+Views simply call `session.booking_error_for(user)` or
+`booking.cancellation_error` and show the returned reason if it is not `None`.
 
-> **Note:** because of rule 2's permanent unique constraint, a member who
-> cancels a booking **cannot re-book the same session**. This follows the
-> project specification as written.
+> **Note:** uniqueness is enforced with a **partial** unique index
+> (`... WHERE status = 'active'`), so a cancelled row never blocks a new one.
+> Cancelling and re-booking the same session creates a second `Booking` row;
+> the cancelled row stays visible in My Bookings with a **Book again** button.
 
 ---
 
@@ -113,7 +116,7 @@ Open <http://127.0.0.1:8000/>.
 
 ## Running the Tests
 
-27 automated tests cover every business rule and the main views:
+30 automated tests cover every business rule and the main views:
 
 ```bash
 python manage.py test gym
@@ -143,7 +146,7 @@ gymproject/
 │   ├── urls.py            # App URL routes
 │   ├── forms.py           # Registration form
 │   ├── admin.py           # Admin registrations (classes, sessions, rosters)
-│   ├── tests.py           # 27 tests
+│   ├── tests.py           # 30 tests
 │   └── templates/gym/     # base, home, register, login, my_bookings, roster
 ├── seed_data.py           # Sample classes and sessions
 ├── smoke_test.py          # End-to-end checks against the real DB
@@ -158,7 +161,7 @@ gymproject/
 | | |
 |---|---|
 | ![Homepage](screenshots/01-home.png) | ![My Bookings](screenshots/03-my-bookings.png) |
-| Homepage with classes, sessions and spots left | My Bookings: cancel button, blocked-cancellation reason, cancelled badge |
+| Homepage with classes, sessions and spots left | My Bookings: cancel button, blocked-cancellation reason, cancelled badge with **Book again** |
 | ![Register](screenshots/02-register.png) | ![Admin](screenshots/05-admin-sessions.png) |
 | Registration | Admin panel — sessions with capacity and spots left |
 
@@ -177,6 +180,8 @@ Additional screenshots: `04-admin-classes.png`, `06-admin-roster.png`
 | Book a session that is already full | Rejected: "This session is fully booked." |
 | Book a session that has started | Rejected: "This session has already started." |
 | Cancel more than 2 hours before start | Cancellation succeeds; the spot is freed |
+| Cancel, then click **Book again** on the cancelled booking | A new active booking is created; spot count decreases again |
+| Re-book while another active booking already exists for that session | Rejected: "You have already booked this session." |
 | Cancel less than 2 hours before start | Rejected with the 2-hour notice |
 | Cancel after the session started | Rejected |
 | Member opens another member's booking URL | HTTP 404 |

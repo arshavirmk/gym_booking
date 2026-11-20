@@ -21,7 +21,11 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "screenshots")
 os.makedirs(OUT, exist_ok=True)
 
 # Build a tidy demo set of bookings for the screenshot user
-demo = User.objects.get(username="smoketester")
+demo, _ = User.objects.get_or_create(
+    username="smoketester", defaults={"email": "smoke@example.com"}
+)
+demo.set_password("S3cure-Pass!")
+demo.save()
 Booking.objects.filter(user=demo).delete()
 
 

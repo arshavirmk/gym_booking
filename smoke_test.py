@@ -32,7 +32,12 @@ for url, name in [("/", "home"), ("/login/", "login"), ("/register/", "register"
           else r.status_code == 302, f"-> {r.status_code}")
 
 # 2. Anonymous booking is blocked
-future = Session.objects.filter(start_time__gt=timezone.now()).order_by("start_time").first()
+# Pick a session comfortably beyond the 2-hour cancellation window.
+future = (
+    Session.objects.filter(start_time__gt=timezone.now() + timedelta(hours=4))
+    .order_by("start_time")
+    .first()
+)
 r = c.post(f"/book/{future.id}/")
 target = getattr(r, "url", "")
 check("Anonymous booking blocked", r.status_code == 302 and "/login/" in target,
@@ -83,6 +88,7 @@ from gym.models import GymClass  # noqa: E402
 
 fill_target = Session.objects.filter(start_time__gt=timezone.now()).order_by(
     "start_time").last()
+original_capacity = fill_target.capacity
 fill_target.capacity = Booking.objects.filter(
     session=fill_target, status="active").count() + 1
 fill_target.save()
@@ -99,12 +105,33 @@ fill_target.refresh_from_db()
 check("Full session booking rejected",
       fill_target.is_full and fill_target.booked_count == before,
       f"(booked={fill_target.booked_count}/{fill_target.capacity})")
+# Clean up the temporary full session so the demo database stays realistic
+Booking.objects.filter(session=fill_target).exclude(
+    user__username=username).delete()
+fill_target.capacity = original_capacity
+fill_target.save()
 
 # 10. Cancellation works when far from start
 r = c.post(f"/cancel/{b.id}/", follow=True)
 b.refresh_from_db()
 check("Cancellation succeeds >2h before start", b.status == "cancelled",
       f"(status={b.status})")
+
+# 10b. Rebooking the same session after cancellation is allowed
+c.post(f"/book/{future.id}/", follow=True)
+active = Booking.objects.filter(
+    user__username=username, session=future, status=Booking.Status.ACTIVE
+).count()
+total = Booking.objects.filter(user__username=username, session=future).count()
+check("Rebooking after cancellation succeeds", active == 1 and total == 2,
+      f"(active={active}, total rows={total})")
+
+# 10c. Booking twice while still active is still blocked
+c.post(f"/book/{future.id}/", follow=True)
+active = Booking.objects.filter(
+    user__username=username, session=future, status=Booking.Status.ACTIVE
+).count()
+check("Second active booking still rejected", active == 1, f"(active={active})")
 
 # 11. Cancellation blocked inside the 2-hour window
 near = Session.objects.create(
@@ -119,10 +146,14 @@ nb.refresh_from_db()
 check("Cancellation blocked inside 2h window", nb.status == "active",
       f"(status={nb.status})")
 nb.delete()
+near.delete()  # keep the demo database tidy between runs
 
 # 12. Member cannot cancel someone else's booking
 victim_booking = Booking.objects.filter(status="active").exclude(
     user__username=username).first()
+if victim_booking is None:
+    victim = User.objects.create_user("victim", password="pw12345!")
+    victim_booking = Booking.objects.create(user=victim, session=future)
 if victim_booking:
     before = victim_booking.status
     r = c.post(f"/cancel/{victim_booking.id}/")

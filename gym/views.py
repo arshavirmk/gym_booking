@@ -70,14 +70,13 @@ def cancel_booking(request, booking_id):
         id=booking_id,
         user=request.user,
     )
-    session = booking.session
-    reason = session.cancellation_error_for(request.user)
+    reason = booking.cancellation_error
     if reason:
         messages.error(request, reason)
     else:
         booking.status = Booking.Status.CANCELLED
         booking.save(update_fields=["status"])
-        messages.success(request, f"Cancelled: {session}.")
+        messages.success(request, f"Cancelled: {booking.session}.")
     return redirect("my_bookings")
 
 

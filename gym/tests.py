@@ -44,10 +44,19 @@ class BookingModelTests(TestCase):
         self.assertEqual(self.session.booked_count, 0)
         self.assertEqual(self.session.available_spots, 2)
 
-    def test_unique_constraint_blocks_double_booking(self):
+    def test_unique_constraint_blocks_two_active_bookings(self):
         Booking.objects.create(user=self.alice, session=self.session)
         with self.assertRaises(IntegrityError), transaction.atomic():
             Booking.objects.create(user=self.alice, session=self.session)
+
+    def test_unique_constraint_allows_rebooking_after_cancel(self):
+        first = Booking.objects.create(user=self.alice, session=self.session)
+        first.status = Booking.Status.CANCELLED
+        first.save()
+        Booking.objects.create(user=self.alice, session=self.session)
+        self.assertEqual(
+            Booking.objects.filter(user=self.alice, session=self.session).count(), 2
+        )
 
     def test_two_different_users_can_book(self):
         Booking.objects.create(user=self.alice, session=self.session)
@@ -90,6 +99,12 @@ class BookingRuleTests(TestCase):
         reason = self.session.booking_error_for(self.alice)
         self.assertIn("already booked", reason.lower())
 
+    def test_can_rebook_after_cancelling(self):
+        first = Booking.objects.create(user=self.alice, session=self.session)
+        first.status = Booking.Status.CANCELLED
+        first.save()
+        self.assertIsNone(self.session.booking_error_for(self.alice))
+
     def test_admin_cannot_book(self):
         admin = User.objects.create_user("root", password="pw12345!", is_staff=True)
         self.assertIsNotNone(self.session.booking_error_for(admin))
@@ -105,7 +120,7 @@ class CancellationRuleTests(TestCase):
 
     def test_can_cancel_more_than_window_before_start(self):
         self.assertTrue(self.session.can_cancel)
-        self.assertIsNone(self.session.cancellation_error_for(self.alice))
+        self.assertIsNone(self.booking.cancellation_error)
 
     def test_cannot_cancel_inside_the_window(self):
         self.session.start_time = timezone.now() + timedelta(
@@ -114,20 +129,20 @@ class CancellationRuleTests(TestCase):
         self.session.end_time = self.session.start_time + timedelta(hours=1)
         self.session.save()
         self.assertFalse(self.session.can_cancel)
-        reason = self.session.cancellation_error_for(self.alice)
+        reason = self.booking.cancellation_error
         self.assertIn(f"{CANCEL_WINDOW_HOURS} hours", reason)
 
     def test_cannot_cancel_started_session(self):
         self.session.start_time = timezone.now() - timedelta(minutes=10)
         self.session.end_time = timezone.now() + timedelta(hours=1)
         self.session.save()
-        reason = self.session.cancellation_error_for(self.alice)
+        reason = self.booking.cancellation_error
         self.assertIn("already started", reason.lower())
 
     def test_cannot_cancel_already_cancelled(self):
         self.booking.status = Booking.Status.CANCELLED
         self.booking.save()
-        reason = self.session.cancellation_error_for(self.alice)
+        reason = self.booking.cancellation_error
         self.assertIn("already cancelled", reason.lower())
 
 
@@ -190,6 +205,24 @@ class ViewTests(TestCase):
         self.client.post(reverse("cancel_booking", args=[booking.id]))
         booking.refresh_from_db()
         self.assertEqual(booking.status, Booking.Status.CANCELLED)
+
+    def test_member_can_rebook_after_cancelling(self):
+        booking = Booking.objects.create(user=self.alice, session=self.session)
+        self.client.login(username="alice", password="pw12345!")
+        self.client.post(reverse("cancel_booking", args=[booking.id]))
+
+        page = self.client.get(reverse("my_bookings"))
+        self.assertContains(page, "Book again")
+
+        resp = self.client.post(
+            reverse("book_session", args=[self.session.id]), follow=True
+        )
+        self.assertEqual(resp.status_code, 200)
+        active = Booking.objects.filter(
+            user=self.alice, session=self.session,
+            status=Booking.Status.ACTIVE,
+        )
+        self.assertEqual(active.count(), 1)
 
     def test_cannot_cancel_inside_window_via_view(self):
         self.session.start_time = timezone.now() + timedelta(hours=1)

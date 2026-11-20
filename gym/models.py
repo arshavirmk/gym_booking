@@ -68,24 +68,8 @@ class Session(models.Model):
             return "This session has already started."
         if self.is_full:
             return "This session is fully booked."
-        if self.bookings.filter(user=user).exists():
+        if self.bookings.filter(user=user, status=Booking.Status.ACTIVE).exists():
             return "You have already booked this session."
-        return None
-
-    def cancellation_error_for(self, user):
-        """Return a reason string if `user` cannot cancel, else None."""
-        booking = self.bookings.filter(user=user).first()
-        if booking is None:
-            return "You have no booking for this session."
-        if booking.status == Booking.Status.CANCELLED:
-            return "This booking is already cancelled."
-        if self.has_started:
-            return "This session has already started."
-        if not self.can_cancel:
-            return (
-                f"Cancellations are only allowed at least "
-                f"{CANCEL_WINDOW_HOURS} hours before the session starts."
-            )
         return None
 
 
@@ -109,7 +93,9 @@ class Booking(models.Model):
         ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(
-                fields=["user", "session"], name="unique_user_session_booking"
+                fields=["user", "session"],
+                condition=models.Q(status="active"),
+                name="unique_active_user_session_booking",
             )
         ]
 
@@ -121,4 +107,18 @@ class Booking(models.Model):
         """Reason this booking cannot be cancelled, or None if it can be."""
         if self.status != self.Status.ACTIVE:
             return "This booking is already cancelled."
-        return self.session.cancellation_error_for(self.user)
+        if self.session.has_started:
+            return "This session has already started."
+        if not self.session.can_cancel:
+            return (
+                f"Cancellations are only allowed at least "
+                f"{CANCEL_WINDOW_HOURS} hours before the session starts."
+            )
+        return None
+
+    @property
+    def can_rebook(self):
+        """True when this is a cancelled booking whose session can be booked again."""
+        if self.status != self.Status.CANCELLED:
+            return False
+        return self.session.booking_error_for(self.user) is None
