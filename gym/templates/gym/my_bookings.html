@@ -3,77 +3,71 @@
 {% block title %}My Bookings{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">My Bookings</h1>
+<section class="page-head">
+  <h1>My bookings</h1>
+  <p class="sub">Track upcoming classes and review your history.</p>
+</section>
 
 {% if bookings %}
-  <div class="card">
-    <div class="table-responsive">
-      <table class="table align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Class</th>
-            <th>Starts</th>
-            <th>Ends</th>
-            <th>Booked on</th>
-            <th>Status</th>
-            <th class="text-end">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for booking in bookings %}
-            {% with session=booking.session %}
-            <tr class="session-row">
-              <td>
-                <strong>{{ session.gym_class.name }}</strong><br>
-                <small class="text-muted">{{ session.gym_class.instructor }}</small>
-              </td>
-              <td>{{ session.start_time|date:"D, M j Y H:i" }}</td>
-              <td>{{ session.end_time|date:"H:i" }}</td>
-              <td>{{ booking.created_at|date:"M j, H:i" }}</td>
-              <td>
-                {% if booking.status == "active" %}
-                  <span class="badge text-bg-success">Active</span>
+  <div class="booking-list mt-4">
+    {% for booking in bookings %}
+      {% with session=booking.session %}
+      <article class="card booking-card{% if booking.status != 'active' %} is-cancelled{% endif %}">
+        <div class="booking-rail" aria-hidden="true"></div>
+        <div class="card-body">
+          <div class="booking-main">
+            <h3>{{ session.gym_class.name }}</h3>
+            <p class="meta">
+              {{ session.start_time|date:"D, M j, Y" }}
+              · {{ session.start_time|date:"H:i" }} – {{ session.end_time|date:"H:i" }}
+            </p>
+            <p class="meta">Instructor: {{ session.gym_class.instructor }}</p>
+            {% if booking.status == "active" %}
+              <p class="status">Booked: {{ booking.created_at|date:"M j, Y H:i" }}</p>
+            {% else %}
+              <p class="status is-cancelled-text">Cancelled</p>
+            {% endif %}
+          </div>
+
+          <div class="booking-action">
+            {% if booking.status == "active" %}
+              {% with reason=booking.cancellation_error %}
+                {% if reason %}
+                  <div class="action-block">
+                    <button class="btn btn-outline-secondary btn-sm" disabled
+                            title="{{ reason }}">Cancel</button>
+                    <div class="cancel-note">{{ reason }}</div>
+                  </div>
                 {% else %}
-                  <span class="badge text-bg-secondary">Cancelled</span>
-                {% endif %}
-              </td>
-              <td class="text-end">
-                {% if booking.status == "active" %}
-                  {% with reason=booking.cancellation_error %}
-                    {% if reason %}
-                      <div class="d-inline-block text-end">
-                        <button class="btn btn-outline-secondary btn-sm" disabled
-                                title="{{ reason }}">Cancel</button>
-                        <div class="text-muted cancel-note">{{ reason }}</div>
-                      </div>
-                    {% else %}
-                      <form method="post" action="{% url 'cancel_booking' booking.id %}" class="d-inline"
-                            onsubmit="return confirm('Cancel this booking?');">
-                        {% csrf_token %}
-                        <button class="btn btn-outline-danger btn-sm">Cancel</button>
-                      </form>
-                    {% endif %}
-                  {% endwith %}
-                {% elif booking.can_rebook %}
-                  <form method="post" action="{% url 'book_session' session.id %}" class="d-inline">
+                  <form method="post" action="{% url 'cancel_booking' booking.id %}"
+                        class="d-inline" data-busy="Cancelling…"
+                        onsubmit="return confirm('Cancel this booking?');">
                     {% csrf_token %}
-                    <input type="hidden" name="next" value="{{ request.path }}">
-                    <button class="btn btn-outline-primary btn-sm">Book again</button>
+                    <button class="btn btn-danger btn-sm">Cancel</button>
                   </form>
-                {% else %}
-                  <span class="text-muted small">&mdash;</span>
                 {% endif %}
-              </td>
-            </tr>
-            {% endwith %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+              {% endwith %}
+            {% elif booking.can_rebook %}
+              <form method="post" action="{% url 'book_session' session.id %}"
+                    class="d-inline" data-busy="Booking…">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button class="btn btn-primary btn-sm">Book again</button>
+              </form>
+            {% else %}
+              <span class="action-none" aria-hidden="true">—</span>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+      {% endwith %}
+    {% endfor %}
   </div>
 {% else %}
-  <div class="alert alert-info">
-    You have no bookings yet. <a href="{% url 'home' %}">Browse classes</a> to book one.
+  <div class="empty-state mt-4">
+    <div class="icon" aria-hidden="true">🗓️</div>
+    <h3>No active bookings.</h3>
+    <p>Head to the <a href="{% url 'home' %}">class schedule</a> to book your next session.</p>
   </div>
 {% endif %}
 {% endblock %}

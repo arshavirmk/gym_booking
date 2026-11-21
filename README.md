@@ -54,7 +54,9 @@ Views simply call `session.booking_error_for(user)` or
 - **SQLite** database (no setup required)
 - Django's built-in auth (`django.contrib.auth`)
 - Django Admin for administration
-- HTML templates + **Bootstrap 5** (CDN)
+- HTML templates + **Bootstrap 5** (CDN) with a custom dark "fitness brand"
+  design system (`gym/static/gym/css/styles.css`, Inter font, volt-green accent)
+  and light JS (`gym/static/gym/js/main.js`) for double-submit protection
 - Django test framework (83 automated tests)
 
 ---
@@ -192,6 +194,10 @@ Expected output ends with `25/25 checks passed`.
 
 Additional screenshots: `04-admin-classes.png`, `06-admin-roster.png`
 (admin view of the members booked into a session).
+
+The member-facing pages use a responsive dark theme (verified at 1400px,
+500px and 390px viewports); the Django Admin keeps its default UI.
+Regenerate all screenshots with `python screenshots.py`.
 
 ---
 

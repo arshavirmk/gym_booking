@@ -1,65 +1,86 @@
 {% extends "gym/base.html" %}
 
-{% block title %}Session Roster{% endblock %}
+{% block title %}Roster — {{ session.gym_class.name }}{% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Classes</a></li>
-    <li class="breadcrumb-item active">Session roster</li>
+    <li class="breadcrumb-item active" aria-current="page">Session roster</li>
   </ol>
 </nav>
 
-<h1 class="h3">{{ session.gym_class.name }} roster</h1>
-<p class="text-muted">
-  {{ session.start_time|date:"D, M j Y H:i" }} &ndash; {{ session.end_time|date:"H:i" }}
-  &middot; {{ session.booked_count }}/{{ session.capacity }} booked
-  &middot; {{ session.available_spots }} spots left
-</p>
+<section class="page-head">
+  <h1>{{ session.gym_class.name }} roster</h1>
+  <p class="sub">
+    {{ session.start_time|date:"D, M j, Y" }} ·
+    {{ session.start_time|date:"H:i" }} – {{ session.end_time|date:"H:i" }}
+    · {{ session.booked_count }}/{{ session.capacity }} booked
+    · {{ session.available_spots }} spots left
+  </p>
+</section>
 
-<div class="card mb-4">
-  <div class="card-header"><strong>Active bookings ({{ active|length }})</strong></div>
-  <div class="table-responsive">
-    <table class="table mb-0 align-middle">
-      <thead class="table-light">
-        <tr><th>#</th><th>Username</th><th>Email</th><th>Booked on</th></tr>
-      </thead>
-      <tbody>
-        {% for booking in active %}
+<section class="mt-4">
+  <div class="card roster-card">
+    <div class="roster-head"><strong>Active bookings ({{ active|length }})</strong></div>
+    <div class="table-responsive">
+      <table class="table roster-table align-middle mb-0">
+        <thead>
           <tr>
-            <td>{{ forloop.counter }}</td>
-            <td>{{ booking.user.username }}</td>
+            <th scope="col">#</th>
+            <th scope="col">Username</th>
+            <th scope="col">Email</th>
+            <th scope="col">Booked on</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for booking in active %}
+          <tr>
+            <td class="index">{{ forloop.counter }}</td>
+            <td class="member">{{ booking.user.username }}</td>
             <td>{{ booking.user.email|default:"-" }}</td>
             <td>{{ booking.created_at|date:"M j, Y H:i" }}</td>
           </tr>
-        {% empty %}
-          <tr><td colspan="4" class="text-muted">No active bookings.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="card">
-  <div class="card-header"><strong>Cancelled bookings ({{ cancelled|length }})</strong></div>
-  <div class="table-responsive">
-    <table class="table mb-0 align-middle">
-      <thead class="table-light">
-        <tr><th>#</th><th>Username</th><th>Email</th><th>Booked on</th></tr>
-      </thead>
-      <tbody>
-        {% for booking in cancelled %}
+          {% empty %}
           <tr>
-            <td>{{ forloop.counter }}</td>
-            <td>{{ booking.user.username }}</td>
+            <td colspan="4" class="empty-cell">No active bookings.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="mt-4">
+  <div class="card roster-card">
+    <div class="roster-head"><strong>Cancelled bookings ({{ cancelled|length }})</strong></div>
+    <div class="table-responsive">
+      <table class="table roster-table align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Username</th>
+            <th scope="col">Email</th>
+            <th scope="col">Booked on</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for booking in cancelled %}
+          <tr>
+            <td class="index">{{ forloop.counter }}</td>
+            <td class="member">{{ booking.user.username }}</td>
             <td>{{ booking.user.email|default:"-" }}</td>
             <td>{{ booking.created_at|date:"M j, Y H:i" }}</td>
           </tr>
-        {% empty %}
-          <tr><td colspan="4" class="text-muted">None.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="empty-cell">None.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
-</div>
+</section>
 {% endblock %}

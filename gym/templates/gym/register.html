@@ -3,40 +3,48 @@
 {% block title %}Register{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-6 col-lg-5">
-    <div class="card">
-      <div class="card-body p-4">
-        <h1 class="h4 mb-4">Create an account</h1>
+<div class="auth-wrap">
+  <div class="auth-grid">
+    <aside class="auth-aside">
+      <h2>Start training today.</h2>
+      <p>Create a free member account and book your first class in under
+         a minute.</p>
+      <ul>
+        <li>Browse the full class schedule</li>
+        <li>Book and cancel from any device</li>
+        <li>See all your bookings in one view</li>
+      </ul>
+    </aside>
 
-        {% if form.non_field_errors %}
-          <div class="alert alert-danger">
-            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+    <section class="card auth-card" aria-labelledby="register-heading">
+      <h1 id="register-heading">Create an account</h1>
+      <p class="sub">Join the gym — it only takes a moment.</p>
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-3" role="alert">
+          {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+        </div>
+      {% endif %}
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% for field in form %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}
+              <div class="form-text">{{ field.help_text|safe }}</div>
+            {% endif %}
+            {% for error in field.errors %}
+              <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
           </div>
-        {% endif %}
+        {% endfor %}
+        <button class="btn btn-success">Register</button>
+      </form>
 
-        <form method="post" novalidate>
-          {% csrf_token %}
-          {% for field in form %}
-            <div class="mb-3">
-              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-              {{ field }}
-              {% if field.help_text %}
-                <div class="form-text">{{ field.help_text|safe }}</div>
-              {% endif %}
-              {% for error in field.errors %}
-                <div class="text-danger small mt-1">{{ error }}</div>
-              {% endfor %}
-            </div>
-          {% endfor %}
-          <button class="btn btn-success w-100">Register</button>
-        </form>
-
-        <p class="text-muted small mt-3 mb-0">
-          Already have an account? <a href="{% url 'login' %}">Log in</a>
-        </p>
-      </div>
-    </div>
+      <p class="auth-foot">Already have an account? <a href="{% url 'login' %}">Log in</a></p>
+    </section>
   </div>
 </div>
 {% endblock %}

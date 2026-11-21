@@ -1,78 +1,113 @@
 {% extends "gym/base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h1 class="h3 mb-0">Gym Classes</h1>
-  <span class="text-muted">
-    {{ classes|length }} class{{ classes|length|pluralize:"es" }} available
-  </span>
-</div>
+<section class="hero">
+  <div class="container-fluid px-0">
+    <span class="hero-eyebrow">Members &amp; administrators</span>
+    <h1>Train on <span class="accent">your schedule.</span></h1>
+    <p class="lead">
+      Browse real-time class availability, book your spot in seconds, and
+      manage every reservation from one place.
+    </p>
+    <div class="hero-actions">
+      {% if user.is_authenticated %}
+        <a class="btn btn-primary btn-lg" href="#classes">Browse classes</a>
+        <a class="btn btn-outline-primary btn-lg" href="{% url 'my_bookings' %}">My bookings</a>
+      {% else %}
+        <a class="btn btn-primary btn-lg" href="{% url 'register' %}">Create free account</a>
+        <a class="btn btn-outline-primary btn-lg" href="{% url 'login' %}">Log in to book</a>
+      {% endif %}
+    </div>
+    <div class="hero-meta">
+      <div class="stat"><b>{{ classes|length }}</b><span>classes on schedule</span></div>
+      <div class="stat"><b>24/7</b><span>online booking</span></div>
+      <div class="stat"><b>2 hrs</b><span>free cancellation window</span></div>
+    </div>
+  </div>
+</section>
 
-{% for gym_class in classes %}
-<div class="card mb-4">
-  <div class="card-body">
-    <h2 class="h5 mb-1">{{ gym_class.name }}</h2>
-    <p class="text-muted mb-1">{{ gym_class.description }}</p>
-    <span class="badge text-bg-secondary">Instructor: {{ gym_class.instructor }}</span>
+<div id="classes">
+  <div class="section-head">
+    <h2>Class schedule</h2>
+    <span class="count-pill">{{ classes|length }} class{{ classes|length|pluralize:"es" }} available</span>
+  </div>
 
-    {% if gym_class.upcoming_sessions %}
-      <div class="table-responsive mt-3">
-        <table class="table align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Starts</th>
-              <th>Ends</th>
-              <th>Capacity</th>
-              <th>Spots left</th>
-              <th class="text-end">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for session in gym_class.upcoming_sessions %}
-              <tr class="session-row">
-                <td>{{ session.start_time|date:"D, M j Y H:i" }}</td>
-                <td>{{ session.end_time|date:"H:i" }}</td>
-                <td>{{ session.capacity }}</td>
-                <td>
+  {% for gym_class in classes %}
+  <article class="card class-card">
+    <div class="card-body">
+      <div class="class-head">
+        <div>
+          <h2>{{ gym_class.name }}</h2>
+          <p class="desc">{{ gym_class.description }}</p>
+          <span class="chip">Instructor: {{ gym_class.instructor }}</span>
+        </div>
+      </div>
+
+      {% if gym_class.upcoming_sessions %}
+        <div class="session-list">
+          {% for session in gym_class.upcoming_sessions %}
+            <div class="session-row">
+              <div class="date-block">
+                <span class="dow">{{ session.start_time|date:"D" }}</span>
+                <span class="dmy">{{ session.start_time|date:"M j, Y" }}</span>
+              </div>
+
+              <div class="session-when">
+                <b>{{ session.start_time|date:"H:i" }} – {{ session.end_time|date:"H:i" }}</b>
+                <span>Capacity {{ session.capacity }} · {{ session.booked_count }} booked</span>
+              </div>
+
+              <div class="avail">
+                <div class="avail-top">
+                  <span class="label">Spots left</span>
                   {% if session.is_full %}
                     <span class="spots-full">FULL</span>
                   {% else %}
                     <span class="spots-ok">{{ session.available_spots }} of {{ session.capacity }}</span>
                   {% endif %}
-                </td>
-                <td class="text-end">
-                  {% if user.is_staff %}
-                    <a class="btn btn-outline-primary btn-sm"
-                       href="{% url 'session_roster' session.id %}">View roster</a>
-                  {% elif session.has_started %}
-                    <span class="badge text-bg-dark">Started</span>
-                  {% elif session.is_full %}
-                    <span class="badge text-bg-danger">Fully booked</span>
-                  {% elif user.is_authenticated %}
-                    <form method="post" action="{% url 'book_session' session.id %}" class="d-inline">
-                      {% csrf_token %}
-                      <input type="hidden" name="next" value="{{ request.path }}">
-                      <button class="btn btn-primary btn-sm">Book</button>
-                    </form>
-                  {% else %}
-                    <a class="btn btn-outline-primary btn-sm"
-                       href="{% url 'login' %}?next={{ request.path|urlencode }}">Log in to book</a>
-                  {% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <p class="text-muted mb-0 mt-2">No upcoming sessions.</p>
-    {% endif %}
-  </div>
+                </div>
+                {% widthratio session.booked_count session.capacity 100 as booked_pct %}
+                <div class="meter{% if session.is_full %} is-full{% endif %}" role="img"
+                     aria-label="{{ session.booked_count }} of {{ session.capacity }} spots booked">
+                  <i style="width: {{ booked_pct }}%"></i>
+                </div>
+              </div>
+
+              <div class="session-action">
+                {% if user.is_staff %}
+                  <a class="btn btn-outline-primary btn-sm"
+                     href="{% url 'session_roster' session.id %}">View roster</a>
+                {% elif session.has_started %}
+                  <span class="badge badge-dark">Started</span>
+                {% elif session.is_full %}
+                  <span class="badge badge-full">Fully booked</span>
+                {% elif user.is_authenticated %}
+                  <form method="post" action="{% url 'book_session' session.id %}" class="d-inline"
+                        data-busy="Booking…">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.path }}">
+                    <button class="btn btn-primary btn-sm">Book</button>
+                  </form>
+                {% else %}
+                  <a class="btn btn-outline-primary btn-sm"
+                     href="{% url 'login' %}?next={{ request.path|urlencode }}">Log in to book</a>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="no-sessions">No upcoming sessions.</p>
+      {% endif %}
+    </div>
+  </article>
+  {% empty %}
+    <div class="empty-state">
+      <div class="icon" aria-hidden="true">🏋️</div>
+      <h3>No classes yet</h3>
+      <p>No classes have been created yet. Add some in the
+        <a href="{% url 'admin:index' %}">admin panel</a>.</p>
+    </div>
+  {% endfor %}
 </div>
-{% empty %}
-  <div class="alert alert-info">
-    No classes have been created yet. Add some in the
-    <a href="{% url 'admin:index' %}">admin panel</a>.
-  </div>
-{% endfor %}
 {% endblock %}

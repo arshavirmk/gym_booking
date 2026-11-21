@@ -3,37 +3,51 @@
 {% block title %}Log in{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-6 col-lg-5">
-    <div class="card">
-      <div class="card-body p-4">
-        <h1 class="h4 mb-4">Log in</h1>
+<div class="auth-wrap">
+  <div class="auth-grid">
+    <aside class="auth-aside">
+      <h2>Welcome back.</h2>
+      <p>Log in to book classes, manage your reservations, and keep your
+         training streak alive.</p>
+      <ul>
+        <li>Real-time spots and availability</li>
+        <li>Cancel free up to 2 hours before start</li>
+        <li>Re-book cancelled sessions in one click</li>
+      </ul>
+    </aside>
 
-        {% if form.non_field_errors %}
-          <div class="alert alert-danger">
-            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
-          </div>
-        {% endif %}
+    <section class="card auth-card" aria-labelledby="login-heading">
+      <h1 id="login-heading">Log in</h1>
+      <p class="sub">Use your member credentials to continue.</p>
 
-        <form method="post" novalidate>
-          {% csrf_token %}
-          {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-          <div class="mb-3">
-            <label class="form-label" for="{{ form.username.id_for_label }}">Username</label>
-            {{ form.username }}
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="{{ form.password.id_for_label }}">Password</label>
-            {{ form.password }}
-          </div>
-          <button class="btn btn-primary w-100">Log in</button>
-        </form>
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-3" role="alert">
+          {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+        </div>
+      {% endif %}
 
-        <p class="text-muted small mt-3 mb-0">
-          No account? <a href="{% url 'register' %}">Register</a>
-        </p>
-      </div>
-    </div>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.username.id_for_label }}">Username</label>
+          {{ form.username }}
+          {% for error in form.username.errors %}
+            <div class="invalid-feedback d-block">{{ error }}</div>
+          {% endfor %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.password.id_for_label }}">Password</label>
+          {{ form.password }}
+          {% for error in form.password.errors %}
+            <div class="invalid-feedback d-block">{{ error }}</div>
+          {% endfor %}
+        </div>
+        <button class="btn btn-primary">Log in</button>
+      </form>
+
+      <p class="auth-foot">No account? <a href="{% url 'register' %}">Register</a></p>
+    </section>
   </div>
 </div>
 {% endblock %}
