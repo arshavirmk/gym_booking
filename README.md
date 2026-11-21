@@ -157,7 +157,7 @@ Expected output ends with `25/25 checks passed`.
 ## Project Structure
 
 ```
-gym-booking/
+.                              # project root
 ├── manage.py              # Django command-line tool
 ├── requirements.txt       # Django==6.1.3
 ├── gymproject/            # Project settings and root URLconf
