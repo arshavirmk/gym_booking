@@ -9,9 +9,11 @@ adds demo bookings for the "smoketester" account so every booking state is
 visible in the screenshots.
 """
 import os
+import re
 import subprocess
 import sys
 from datetime import timedelta
+from pathlib import Path
 
 import django
 
@@ -20,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 django.setup()
 
 from django.contrib.auth.models import User  # noqa: E402
+from django.contrib.staticfiles import finders  # noqa: E402
 from django.test import Client  # noqa: E402
 from django.utils import timezone  # noqa: E402
 
@@ -100,6 +103,24 @@ pages = [
 ]
 
 saved = []
+
+
+def rewrite_static_urls(html):
+    """Point /static/... references at the real files.
+
+    Screenshots open the rendered HTML from file:///, where Django's /static/
+    URLs do not resolve, so the admin pages would render unstyled.
+    """
+
+    def replace(match):
+        found = finders.find(match.group(2))
+        if found:
+            return match.group(1) + "file:///" + Path(found).as_posix()
+        return match.group(0)
+
+    return re.sub(r'(["\'])/static/([^"\']+)', replace, html)
+
+
 for name, client, url, height in pages:
     response = client.get(url, follow=True)
     if response.status_code != 200:
@@ -107,7 +128,7 @@ for name, client, url, height in pages:
         continue
     path = os.path.join(OUT, name + ".html")
     with open(path, "w", encoding="utf-8") as handle:
-        handle.write(response.content.decode("utf-8"))
+        handle.write(rewrite_static_urls(response.content.decode("utf-8")))
     saved.append((name, path, height))
     print(f"rendered {name} <- {url}")
 

@@ -144,27 +144,16 @@ if past:
 else:
     check("Past session exists (run seed_data.py)", False, "no past session found")
 
-# 11. Full sessions cannot be booked
-fill_target = (
-    Session.objects.filter(start_time__gt=timezone.now())
-    .order_by("start_time")
-    .last()
+# 11. Full sessions cannot be booked (throwaway session so no existing
+# session, capacity, or other member's booking is touched)
+fill_target = Session.objects.create(
+    gym_class=GymClass.objects.first(),
+    start_time=timezone.now() + timedelta(days=1),
+    end_time=timezone.now() + timedelta(days=1, hours=1),
+    capacity=1,
 )
-original_capacity = fill_target.capacity
-fill_target.capacity = (
-    Booking.objects.filter(session=fill_target, status="active").count() + 1
-)
-fill_target.save()
-filler_index = 0
-while not fill_target.is_full:
-    filler_index += 1
-    filler, created = User.objects.get_or_create(
-        username=f"filler{filler_index}"
-    )
-    if created:
-        filler.set_password("pw12345!")
-        filler.save()
-    Booking.objects.get_or_create(user=filler, session=fill_target)
+filler, _ = User.objects.get_or_create(username="filler1")
+Booking.objects.get_or_create(user=filler, session=fill_target)
 fill_target.refresh_from_db()
 before = fill_target.booked_count
 c.post(f"/book/{fill_target.id}/", follow=True)
@@ -174,11 +163,7 @@ check(
     fill_target.is_full and fill_target.booked_count == before,
     f"(booked={fill_target.booked_count}/{fill_target.capacity})",
 )
-Booking.objects.filter(session=fill_target).exclude(
-    user__username=username
-).delete()
-fill_target.capacity = original_capacity
-fill_target.save()
+fill_target.delete()  # cascades the filler booking
 
 # 12. Cancellation works well before the start time
 c.post(f"/cancel/{booking.id}/", follow=True)

@@ -79,12 +79,18 @@ GitHub or any remote repository.**
     filler/victim users cleaned up at end (verified 2 consecutive runs).
 17. **`screenshots.py` created duplicate near-sessions each run** → reuses
     an existing session in the 20min–2h window.
+18. **`smoke_test.py` full-session check mutated a real session** (changed
+    its capacity and deleted other members' bookings) → now uses a
+    throwaway session that is deleted afterwards (no side effects).
+19. **Admin screenshots rendered unstyled** (`/static/` URLs don't resolve
+    from `file:///`) → `screenshots.py` now rewrites static references to
+    absolute `file:///` paths via the staticfiles finders.
 
 ### Configuration
-18. **Dead `MAILERS` setting** (not a real Django setting) removed.
-19. **`requirements.txt` unpinned** → pinned to `Django==6.1.3`.
-20. **Duplicate assertion block** left in `tests.py` from diagnostics removed.
-21. **`test_db.sqlite3`** added to `.gitignore` (file-backed test DB).
+20. **Dead `MAILERS` setting** (not a real Django setting) removed.
+21. **`requirements.txt` unpinned** → pinned to `Django==6.1.3`.
+22. **Duplicate assertion block** left in `tests.py` from diagnostics removed.
+23. **`test_db.sqlite3`** added to `.gitignore` (file-backed test DB).
 
 ---
 
