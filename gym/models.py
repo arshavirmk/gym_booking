@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -27,12 +28,45 @@ class Session(models.Model):
 
     class Meta:
         ordering = ["start_time"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(capacity__gte=1),
+                name="session_capacity_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(end_time__gt=models.F("start_time")),
+                name="session_end_after_start",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.gym_class.name} - {self.start_time:%Y-%m-%d %H:%M}"
 
+    def clean(self):
+        super().clean()
+        if self.start_time and self.end_time and self.end_time <= self.start_time:
+            raise ValidationError(
+                {"end_time": "End time must be after the start time."}
+            )
+        if self.pk and self.capacity < self.booked_count:
+            raise ValidationError(
+                {
+                    "capacity": (
+                        "Capacity cannot be lower than the number of active "
+                        f"bookings ({self.booked_count})."
+                    )
+                }
+            )
+
     @property
     def booked_count(self):
+        cache = getattr(self, "_prefetched_objects_cache", None)
+        if cache and "bookings" in cache:
+            return sum(
+                1
+                for booking in cache["bookings"]
+                if booking.status == Booking.Status.ACTIVE
+            )
         return self.bookings.filter(status=Booking.Status.ACTIVE).count()
 
     @property
@@ -56,12 +90,8 @@ class Session(models.Model):
     def can_cancel(self):
         return self.minutes_until_start >= CANCEL_WINDOW_HOURS * 60
 
-    @property
-    def is_past(self):
-        return self.end_time <= timezone.now()
-
     def booking_error_for(self, user):
-        """Return a reason string if `user` cannot book this session, else None."""
+        """Reason `user` cannot book this session, or None if they can."""
         if user.is_staff:
             return "Administrators cannot book sessions."
         if self.has_started:
@@ -96,6 +126,16 @@ class Booking(models.Model):
                 fields=["user", "session"],
                 condition=models.Q(status="active"),
                 name="unique_active_user_session_booking",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=["active", "cancelled"]),
+                name="booking_status_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["session", "status"],
+                name="booking_session_status_idx",
             )
         ]
 
@@ -111,14 +151,14 @@ class Booking(models.Model):
             return "This session has already started."
         if not self.session.can_cancel:
             return (
-                f"Cancellations are only allowed at least "
+                "Cancellations are only allowed at least "
                 f"{CANCEL_WINDOW_HOURS} hours before the session starts."
             )
         return None
 
     @property
     def can_rebook(self):
-        """True when this is a cancelled booking whose session can be booked again."""
+        """True for a cancelled booking whose session is still bookable."""
         if self.status != self.Status.CANCELLED:
             return False
         return self.session.booking_error_for(self.user) is None

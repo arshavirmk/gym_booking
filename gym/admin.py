@@ -7,7 +7,6 @@ class SessionInline(admin.TabularInline):
     model = Session
     extra = 1
     fields = ("start_time", "end_time", "capacity")
-    readonly_fields = ()
 
 
 @admin.register(GymClass)
@@ -24,9 +23,13 @@ class GymClassAdmin(admin.ModelAdmin):
 class BookingInline(admin.TabularInline):
     model = Booking
     extra = 0
-    readonly_fields = ("user", "created_at", "status")
-    can_delete = False
     fields = ("user", "status", "created_at")
+    readonly_fields = ("user", "status", "created_at")
+    can_delete = False
+    show_change_link = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Session)
@@ -57,4 +60,18 @@ class BookingAdmin(admin.ModelAdmin):
     list_display = ("user", "session", "status", "created_at")
     list_filter = ("status", "session__gym_class")
     search_fields = ("user__username", "user__email", "session__gym_class__name")
-    readonly_fields = ("user", "session", "created_at")
+    readonly_fields = ("user", "session", "status", "created_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+admin.site.site_header = "Gym Administration"
+admin.site.site_title = "Gym Admin"
+admin.site.index_title = "Management"

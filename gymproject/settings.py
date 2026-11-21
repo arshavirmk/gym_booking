@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 
+from django.contrib.messages import constants as message_constants
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -73,14 +75,27 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'gymproject.wsgi.application'
 
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
+#
+# transaction_mode "IMMEDIATE" makes SQLite take the write lock when a
+# transaction starts. Booking checks capacity and then inserts; without this
+# two simultaneous requests could both pass the capacity check.
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            'timeout': 20,
+            'transaction_mode': 'IMMEDIATE',
+        },
+        'TEST': {
+            'NAME': BASE_DIR / 'test_db.sqlite3',
+        },
     }
 }
 
@@ -122,11 +137,10 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
+# Messages
+# Bootstrap uses "danger" where Django uses "error"; map the tags so every
+# alert renders with a valid Bootstrap class.
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
+MESSAGE_TAGS = {
+    message_constants.ERROR: 'danger',
 }

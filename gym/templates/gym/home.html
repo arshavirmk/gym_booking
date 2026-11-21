@@ -3,19 +3,17 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1 class="h3 mb-0">Gym Classes</h1>
-  <span class="text-muted">{{ classes|length }} classes available</span>
+  <span class="text-muted">
+    {{ classes|length }} class{{ classes|length|pluralize:"es" }} available
+  </span>
 </div>
 
 {% for gym_class in classes %}
 <div class="card mb-4">
   <div class="card-body">
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-      <div>
-        <h2 class="h5 mb-1">{{ gym_class.name }}</h2>
-        <p class="text-muted mb-1">{{ gym_class.description }}</p>
-        <span class="badge text-bg-secondary">Instructor: {{ gym_class.instructor }}</span>
-      </div>
-    </div>
+    <h2 class="h5 mb-1">{{ gym_class.name }}</h2>
+    <p class="text-muted mb-1">{{ gym_class.description }}</p>
+    <span class="badge text-bg-secondary">Instructor: {{ gym_class.instructor }}</span>
 
     {% if gym_class.upcoming_sessions %}
       <div class="table-responsive mt-3">
@@ -31,38 +29,37 @@
           </thead>
           <tbody>
             {% for session in gym_class.upcoming_sessions %}
-              {% with booked=session.booked_count left=session.available_spots %}
               <tr class="session-row">
                 <td>{{ session.start_time|date:"D, M j Y H:i" }}</td>
                 <td>{{ session.end_time|date:"H:i" }}</td>
                 <td>{{ session.capacity }}</td>
                 <td>
-                  {% if left <= 0 %}
+                  {% if session.is_full %}
                     <span class="spots-full">FULL</span>
                   {% else %}
-                    <span class="spots-ok">{{ left }} of {{ session.capacity }}</span>
+                    <span class="spots-ok">{{ session.available_spots }} of {{ session.capacity }}</span>
                   {% endif %}
                 </td>
                 <td class="text-end">
-                  {% if session.has_started %}
+                  {% if user.is_staff %}
+                    <a class="btn btn-outline-primary btn-sm"
+                       href="{% url 'session_roster' session.id %}">View roster</a>
+                  {% elif session.has_started %}
                     <span class="badge text-bg-dark">Started</span>
                   {% elif session.is_full %}
                     <span class="badge text-bg-danger">Fully booked</span>
                   {% elif user.is_authenticated %}
-                    {% if user.is_staff %}
-                      <a class="btn btn-outline-primary btn-sm" href="{% url 'session_roster' session.id %}">View roster</a>
-                    {% else %}
-                      <form method="post" action="{% url 'book_session' session.id %}" class="d-inline">
-                        {% csrf_token %}
-                        <button class="btn btn-primary btn-sm">Book</button>
-                      </form>
-                    {% endif %}
+                    <form method="post" action="{% url 'book_session' session.id %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="next" value="{{ request.path }}">
+                      <button class="btn btn-primary btn-sm">Book</button>
+                    </form>
                   {% else %}
-                    <a class="btn btn-outline-primary btn-sm" href="{% url 'login' %}?next={% url 'home' %}">Log in to book</a>
+                    <a class="btn btn-outline-primary btn-sm"
+                       href="{% url 'login' %}?next={{ request.path|urlencode }}">Log in to book</a>
                   {% endif %}
                 </td>
               </tr>
-              {% endwith %}
             {% endfor %}
           </tbody>
         </table>
@@ -73,6 +70,9 @@
   </div>
 </div>
 {% empty %}
-  <div class="alert alert-info">No classes have been created yet. Add some in the <a href="{% url 'admin:index' %}">admin panel</a>.</div>
+  <div class="alert alert-info">
+    No classes have been created yet. Add some in the
+    <a href="{% url 'admin:index' %}">admin panel</a>.
+  </div>
 {% endfor %}
 {% endblock %}

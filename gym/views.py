@@ -1,23 +1,39 @@
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from .forms import RegisterForm
 from .models import Booking, GymClass, Session
 
 
+def _safe_redirect_target(request, default="home"):
+    """Return a validated local URL to redirect to, or `default`."""
+    target = request.POST.get("next") or request.GET.get("next") or ""
+    if target and url_has_allowed_host_and_scheme(
+        target,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return target
+    return default
+
+
 def home(request):
-    classes = GymClass.objects.prefetch_related("sessions__bookings")
-    now = timezone.now()
-    for gym_class in classes:
-        gym_class.upcoming_sessions = [
-            s for s in gym_class.sessions.all() if s.end_time > now
-        ]
-    return render(request, "gym/home.html", {"classes": classes, "now": now})
+    classes = GymClass.objects.prefetch_related(
+        Prefetch(
+            "sessions",
+            queryset=Session.objects.filter(
+                end_time__gt=timezone.now()
+            ).prefetch_related("bookings"),
+            to_attr="upcoming_sessions",
+        )
+    )
+    return render(request, "gym/home.html", {"classes": classes})
 
 
 def register(request):
@@ -28,7 +44,9 @@ def register(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
-            messages.success(request, f"Welcome, {user.username}! Your account is ready.")
+            messages.success(
+                request, f"Welcome, {user.username}! Your account is ready."
+            )
             return redirect("home")
     else:
         form = RegisterForm()
@@ -46,55 +64,66 @@ def my_bookings(request):
 
 
 @login_required
-@require_POST
-@transaction.atomic
 def book_session(request, session_id):
-    session = get_object_or_404(
-        Session.objects.select_for_update(), id=session_id
-    )
-    reason = session.booking_error_for(request.user)
-    if reason:
-        messages.error(request, reason)
-    else:
-        Booking.objects.create(user=request.user, session=session)
-        messages.success(request, f"Booked: {session}.")
-    return redirect(request.META.get("HTTP_REFERER", "home"))
+    if request.method != "POST":
+        messages.info(request, "Choose a session and press the Book button.")
+        return redirect("home")
+
+    with transaction.atomic():
+        session = get_object_or_404(
+            Session.objects.select_for_update(), pk=session_id
+        )
+        reason = session.booking_error_for(request.user)
+        if reason:
+            messages.error(request, reason)
+        else:
+            try:
+                with transaction.atomic():
+                    Booking.objects.create(user=request.user, session=session)
+            except IntegrityError:
+                messages.error(request, "You have already booked this session.")
+            else:
+                messages.success(request, f"Booked: {session}.")
+
+    return redirect(_safe_redirect_target(request, "home"))
 
 
 @login_required
-@require_POST
-@transaction.atomic
 def cancel_booking(request, booking_id):
-    booking = get_object_or_404(
-        Booking.objects.select_for_update(),
-        id=booking_id,
-        user=request.user,
-    )
-    reason = booking.cancellation_error
-    if reason:
-        messages.error(request, reason)
-    else:
-        booking.status = Booking.Status.CANCELLED
-        booking.save(update_fields=["status"])
-        messages.success(request, f"Cancelled: {booking.session}.")
+    if request.method != "POST":
+        messages.info(request, "Open My Bookings and press the Cancel button.")
+        return redirect("my_bookings")
+
+    with transaction.atomic():
+        booking = get_object_or_404(
+            Booking.objects.select_for_update(),
+            pk=booking_id,
+            user=request.user,
+        )
+        reason = booking.cancellation_error
+        if reason:
+            messages.error(request, reason)
+        else:
+            booking.status = Booking.Status.CANCELLED
+            booking.save(update_fields=["status"])
+            messages.success(request, f"Cancelled: {booking.session}.")
+
     return redirect("my_bookings")
 
 
+@login_required
 def session_roster(request, session_id):
-    """Admin-only: list of members booked into a session."""
+    """Staff only: the list of members booked into a session."""
     if not request.user.is_staff:
         messages.error(request, "Administrators only.")
         return redirect("home")
+
     session = get_object_or_404(
-        Session.objects.select_related("gym_class").prefetch_related(
-            "bookings__user"
-        ),
-        id=session_id,
+        Session.objects.select_related("gym_class"), pk=session_id
     )
-    active = session.bookings.filter(status=Booking.Status.ACTIVE).select_related("user")
-    cancelled = session.bookings.filter(status=Booking.Status.CANCELLED).select_related(
-        "user"
-    )
+    bookings = session.bookings.select_related("user")
+    active = bookings.filter(status=Booking.Status.ACTIVE)
+    cancelled = bookings.filter(status=Booking.Status.CANCELLED)
     return render(
         request,
         "gym/roster.html",

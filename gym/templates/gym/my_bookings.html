@@ -41,7 +41,11 @@
                 {% if booking.status == "active" %}
                   {% with reason=booking.cancellation_error %}
                     {% if reason %}
-                      <span class="text-muted small" title="{{ reason }}">{{ reason }}</span>
+                      <div class="d-inline-block text-end">
+                        <button class="btn btn-outline-secondary btn-sm" disabled
+                                title="{{ reason }}">Cancel</button>
+                        <div class="text-muted cancel-note">{{ reason }}</div>
+                      </div>
                     {% else %}
                       <form method="post" action="{% url 'cancel_booking' booking.id %}" class="d-inline"
                             onsubmit="return confirm('Cancel this booking?');">
@@ -50,15 +54,14 @@
                       </form>
                     {% endif %}
                   {% endwith %}
+                {% elif booking.can_rebook %}
+                  <form method="post" action="{% url 'book_session' session.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.path }}">
+                    <button class="btn btn-outline-primary btn-sm">Book again</button>
+                  </form>
                 {% else %}
-                  {% if booking.can_rebook %}
-                    <form method="post" action="{% url 'book_session' session.id %}" class="d-inline">
-                      {% csrf_token %}
-                      <button class="btn btn-outline-primary btn-sm">Book again</button>
-                    </form>
-                  {% else %}
-                    <span class="text-muted small">&mdash;</span>
-                  {% endif %}
+                  <span class="text-muted small">&mdash;</span>
                 {% endif %}
               </td>
             </tr>
