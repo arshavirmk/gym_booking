@@ -113,6 +113,26 @@ Open <http://127.0.0.1:8000/>.
 
 ---
 
+## Environment Variables
+
+All optional — the app works with none of them set (local development
+defaults apply). Set them in your shell, or in a `.env` file (git-ignored).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | built-in dev-only placeholder | Secret key. **Set your own random value** for any shared, staging, or production use. |
+| `DJANGO_DEBUG` | `true` (debug on) | Set to `0`, `false`, or `no` to turn `DEBUG` off. |
+
+PowerShell example:
+
+```powershell
+$env:DJANGO_SECRET_KEY = "paste-a-long-random-string-here"
+$env:DJANGO_DEBUG = "0"
+python manage.py runserver
+```
+
+---
+
 ## Running the Tests
 
 83 automated tests cover every business rule, view, authentication flow,
@@ -190,7 +210,7 @@ Additional screenshots: `04-admin-classes.png`, `06-admin-roster.png`
 | Cancel less than 2 hours before start | Rejected with the 2-hour notice |
 | Cancel after the session started | Rejected |
 | Member opens another member's booking URL | HTTP 404 |
-| Member opens a roster URL | Redirected to the homepage |
+| Member opens a roster URL | HTTP 403 Forbidden |
 | Admin opens a roster URL | Sees the list of booked members |
 | Admin tries to reduce capacity below bookings | Rejected with validation error |
 | Admin tries to delete a booking | HTTP 403 (read-only) |
@@ -199,15 +219,37 @@ Additional screenshots: `04-admin-classes.png`, `06-admin-roster.png`
 
 ## Security Notes
 
-- `DEBUG = True` and the `SECRET_KEY` in `settings.py` are for **local development only**.
-  Do not deploy this configuration to production.
+- `SECRET_KEY` and `DEBUG` are read from the `DJANGO_SECRET_KEY` and
+  `DJANGO_DEBUG` environment variables (see above). Without them the app
+  falls back to a development-only placeholder key with `DEBUG` on —
+  **fine locally, never deploy that way.**
+- An older development key exists in local git history; it is not a
+  production secret, but set `DJANGO_SECRET_KEY` before any shared use.
 - Passwords are hashed with Django's `PBKDF2` via `django.contrib.auth`.
 - Registration uses `UserCreationForm` with Django's built-in password validators.
 - Open-redirect protection: `next` parameters are validated with
   `url_has_allowed_host_and_scheme` before redirecting.
 - CSRF protection is enabled on all forms via `{% csrf_token %}`.
-- SQLite uses `transaction_mode=IMMEDIATE` to prevent concurrent-write races
-  from overselling capacity.
+- The roster page returns **HTTP 403** to logged-in non-staff users and
+  redirects anonymous users to the login page.
+- SQLite uses `transaction_mode=IMMEDIATE` (verified supported by the
+  installed Django 6.1.3) so the capacity check and the insert run under
+  the database write lock. An 8-thread concurrency test proves capacity
+  is never exceeded.
+- Times are displayed in **Asia/Tehran**; timestamps are stored in UTC
+  (`USE_TZ = True`).
+
+---
+
+## Known Limitations
+
+- Local development configuration only (`DEBUG` on by default) — not
+  hardened for public deployment.
+- SQLite is a single-writer database: fine for a class project or small
+  gym, use PostgreSQL for high traffic.
+- No email/password-reset flow (out of scope).
+- Bookings are read-only in the admin by design; members cancel through
+  the My Bookings page.
 
 ---
 

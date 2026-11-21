@@ -477,8 +477,7 @@ class ViewTests(TestCase):
     def test_roster_requires_staff(self):
         self.client.login(username="alice", password="pw12345!")
         resp = self.client.get(reverse("session_roster", args=[self.session.id]))
-        self.assertEqual(resp.status_code, 302)
-        self.assertIn(reverse("home"), resp.url)
+        self.assertEqual(resp.status_code, 403)
 
     def test_roster_shows_booked_members_to_staff(self):
         Booking.objects.create(user=self.alice, session=self.session)

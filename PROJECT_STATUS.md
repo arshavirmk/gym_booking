@@ -170,3 +170,58 @@ Admin panel: `http://127.0.0.1:8000/admin/` with the superuser you created.
   `git remote -v` is empty; the repository has only local commits.
 - The real database (`db.sqlite3`) and user data were preserved.
 - No destructive operations were performed.
+
+---
+
+## 8. Second-Round Review (external code review) — applied
+
+All 11 review points verified against the actual code before any change;
+only confirmed issues were fixed.
+
+### Changes made
+1. **Roster permissions** — authenticated non-staff users now get
+   **HTTP 403** (`PermissionDenied`) instead of a redirect; anonymous
+   users still redirect to login (`@login_required`). Tests and smoke
+   test updated to assert 403; staff access unchanged (tested).
+2. **SECRET_KEY / DEBUG from environment** — `DJANGO_SECRET_KEY` and
+   `DJANGO_DEBUG` env vars with safe local-dev fallbacks; app works with
+   no env vars set. `.env` is git-ignored (user added). An older dev key
+   exists in git history — history was NOT rewritten (as instructed);
+   documented in README.
+3. **TIME_ZONE = Asia/Tehran** — confirmed appropriate (machine is Iran
+   Standard Time); `USE_TZ=True` unchanged; storage stays UTC; all app
+   code already used `timezone.now()` (verified: zero naive-datetime
+   usages). `seed_data.py` now seeds in local time so sample classes
+   land at 7:00/12:00/18:00 local. Screenshots regenerated.
+4. **SQLite concurrency** — `transaction_mode: "IMMEDIATE"` verified
+   present in settings AND supported by installed Django 6.1.3
+   (`django/db/backends/sqlite3/base.py` defines the allowed modes).
+   Concurrency test re-run independently: OK (8 threads, capacity 3 ?
+   exactly 3 booked, 0 failures). README claim is accurate.
+5. **my_bookings queries** — added `user` to `select_related` (the
+   `can_rebook` path touched `booking.user` per cancelled row ? N+1).
+   No other optimization needed; `session__gym_class` already joined.
+6. **Started sessions on homepage** — verified already correct:
+   ongoing sessions are listed (`end_time > now`), show a "Started"
+   badge, and never show a Book button (unit test + screenshot proof).
+7. **Full file review** — settings, both urls.py, forms, admin, all
+   templates, tests, requirements, smoke/screenshots/seed scripts,
+   migrations, .gitignore re-inspected; no further defects found.
+   User's own commit `f18e04a` added `.env` to .gitignore (kept).
+
+### Verification results (this round)
+| Check | Result |
+|---|---|
+| `manage.py test gym` | **83/83 OK** |
+| `ConcurrencyTests` (run alone) | **OK** |
+| `smoke_test.py` | **25/25** |
+| `manage.py check` | no issues |
+| `makemigrations --check` | no changes detected |
+| Clean setup (fresh temp dir: venv, install, check, migrate, seed, superuser, tests, smoke) | **all pass** |
+| Screenshots (6, regenerated after TZ change) | verified visually |
+
+### Git (this round)
+- Remote `origin` now exists (created by the project owner; local branch
+  `main` tracks `origin/main`). **Nothing was pushed by this review** —
+  no push, no history rewrite, no destructive commands.
+- Local commit added for these changes.

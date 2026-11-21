@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 from django.contrib.messages import constants as message_constants
@@ -22,10 +23,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-e7o@0uid(y4%5s^oo-!46s06rujab21*_a^g42&#fl(7il-$b_'
+# Set DJANGO_SECRET_KEY in the environment for anything beyond local
+# development (e.g. in a .env file — .env is git-ignored). The fallback
+# below is an inert development-only placeholder.
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-local-dev-only-set-DJANGO_SECRET_KEY-for-any-shared-use',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DJANGO_DEBUG=0 (or false/no) turns debug off; unset means debug on.
+DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() not in ('0', 'false', 'no')
 
 ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
 
@@ -124,7 +132,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+# Local time for this gym (matches the machine's Iran Standard Time).
+# Storage stays UTC because USE_TZ is enabled; only display is local.
+TIME_ZONE = 'Asia/Tehran'
 
 USE_I18N = True
 

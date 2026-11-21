@@ -16,7 +16,7 @@ if GymClass.objects.exists():
     print("Sample data already present, skipping.")
     sys.exit(0)
 
-now = timezone.now().replace(minute=0, second=0, microsecond=0)
+now = timezone.localtime().replace(minute=0, second=0, microsecond=0)
 
 samples = [
     ("Yoga", "Improve flexibility and calm the mind.", "Ava Patel", 20, 2),

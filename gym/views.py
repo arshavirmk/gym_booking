@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404, redirect, render
@@ -57,7 +58,7 @@ def register(request):
 def my_bookings(request):
     bookings = (
         Booking.objects.filter(user=request.user)
-        .select_related("session__gym_class")
+        .select_related("user", "session__gym_class")
         .order_by("-created_at")
     )
     return render(request, "gym/my_bookings.html", {"bookings": bookings})
@@ -115,8 +116,7 @@ def cancel_booking(request, booking_id):
 def session_roster(request, session_id):
     """Staff only: the list of members booked into a session."""
     if not request.user.is_staff:
-        messages.error(request, "Administrators only.")
-        return redirect("home")
+        raise PermissionDenied
 
     session = get_object_or_404(
         Session.objects.select_related("gym_class"), pk=session_id

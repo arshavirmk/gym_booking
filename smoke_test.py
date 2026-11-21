@@ -257,7 +257,7 @@ check(
 response = c.get(f"/roster/{future.id}/")
 check(
     "Member blocked from roster",
-    response.status_code == 302 and response["Location"] == "/",
+    response.status_code == 403,
     f"-> {response.status_code}",
 )
 
